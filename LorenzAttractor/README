@@ -1,0 +1,19 @@
+This was built off of the coordinate system from ex6
+
+You should just have to do make, then ./Lorenz
+
+The most interesting thing I ran into was that if you increase the radius, it will change x,y,z. So if you dont make x,y,z change back to their original value, then when you decrease the radius back to its original value, you won't get the same points. 
+
+The visual starts on something I thought looked good. But once the radius has been changed, you can't get back. 
+
+This took me around 4.5 hours, most of which was spent trying to make the thing pretty. 
+
+Key bindings
+  1      Normal Black and White Mode
+  2      Color Mode
+  3      Changing Color Mode  -- This one is my favorite
+  4      Hypnotize mode :()
+  +/-    Increase/decrease Radius
+  arrows Change view angle
+  0      Reset view angle
+  ESC    Exit
