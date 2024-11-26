@@ -84,6 +84,15 @@ typedef struct {
 #define MAX_FRAMES  9409   // Total number of frames or points in the animation, probably should interpret file length, but this is fine for now
 
 
+//Data for recreating the OBJ loader
+typedef struct {
+    float position[3];
+    float color[3];
+} objVertex;
+
+
+#define MAX_VERTICES 1000
+#define MAX_NORMALS 1000
 
 
 #define PI 3.14159265358979323846

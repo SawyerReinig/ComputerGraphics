@@ -56,8 +56,133 @@ float upperArmLength = 2;
 float forearmLength = 2;
 
 int SuperHotModel;          //  Object display list
-double ObjScale = 1; 
+double ObjScale = 0.5; 
 
+float RGBA[4] = {1,1,1,1};  //  Colors
+
+typedef struct {
+    float vertex[3];
+    float normal;
+} FaceDataIndex;
+
+objVertex vertices[MAX_VERTICES];
+float normals[MAX_NORMALS][3];
+FaceDataIndex objDataIndices[MAX_NORMALS]; 
+
+int vertex_count = 0;
+int normal_count = 0;
+int face_count = 0; 
+
+// Function to parse the OBJ file
+void loadOBJWithColor(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error: Cannot open file %s\n", filename);
+        return;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "v ", 2) == 0) { // Vertex line
+            if (vertex_count >= MAX_VERTICES) {
+                fprintf(stderr, "Error: Exceeded maximum number of vertices.\n");
+                break;
+            }
+
+            objVertex vertex;
+            sscanf(line, "v %f %f %f %f %f %f", 
+                   &vertex.position[0], &vertex.position[1], &vertex.position[2],
+                   &vertex.color[0], &vertex.color[1], &vertex.color[2]);
+            vertices[vertex_count++] = vertex;
+        } else if (strncmp(line, "vn ", 3) == 0) { // Normal line
+            if (normal_count >= MAX_NORMALS) {
+                fprintf(stderr, "Error: Exceeded maximum number of normals.\n");
+                break;
+            }
+
+            sscanf(line, "vn %f %f %f",
+                   &normals[normal_count][0], &normals[normal_count][1], &normals[normal_count][2]);
+            normal_count++;
+        } else if (strncmp(line, "f ", 2) == 0) { // Face line
+    int vertex_indices[3];
+    int normal_index;
+    
+    // Parse the face line to extract vertex and normal indices
+    if (sscanf(line, "f %d//%d %d//%d %d//%d",
+               &vertex_indices[0], &normal_index,
+               &vertex_indices[1], &normal_index,
+               &vertex_indices[2], &normal_index) != 6) {
+        fprintf(stderr, "Error: Face line format not as expected.\n");
+        continue;
+    }
+    objDataIndices[face_count].vertex[0] = vertex_indices[0];
+    objDataIndices[face_count].vertex[1] = vertex_indices[1];
+    objDataIndices[face_count].vertex[2] = vertex_indices[2];
+    objDataIndices[face_count].normal = normal_index;
+    face_count = face_count+1; 
+printf("Face Count is: %d \n", face_count);
+    
+}
+    }
+     
+
+    fclose(file);
+}
+
+// Function to print the parsed data
+void printOBJData() {
+    printf("Parsed Vertices:\n");
+    for (int i = 0; i < vertex_count; i++) {
+        printf("Vertex %d: Position(%f, %f, %f) Color(%f, %f, %f)\n", 
+               i + 1,
+               vertices[i].position[0], vertices[i].position[1], vertices[i].position[2],
+               vertices[i].color[0], vertices[i].color[1], vertices[i].color[2]);
+    }
+
+    printf("\nParsed Normals:\n");
+    for (int i = 0; i < normal_count; i++) {
+        printf("Normal %d: (%f, %f, %f)\n",
+               i + 1,
+               normals[i][0], normals[i][1], normals[i][2]);
+    }
+}
+
+void DrawObj(){
+   for(int face = 0; face < face_count; face++){
+      glPushMatrix();
+      // glTranslated(face/300,face/300,face/300); 
+
+      glBegin(GL_TRIANGLES);
+      // For each vertex in the triangle
+      for (int i = 0; i < 3; i++) {
+         // Adjust for 1-based indexing in the OBJ file
+         int v_idx = objDataIndices[face].vertex[i] - 1; 
+         int n_idx = objDataIndices[face].normal - 1;
+
+         if (v_idx >= vertex_count || n_idx >= normal_count || v_idx < 0 || n_idx < 0) {
+            fprintf(stderr, "Error: Index out of bounds in face line.\n");
+            continue;
+         }
+        
+          
+         
+         // Set the normal for this vertex
+         glNormal3f(normals[n_idx][0], normals[n_idx][1], normals[n_idx][2]);
+
+         // Set the vertex color
+         glColor3f(vertices[v_idx].color[0], vertices[v_idx].color[1], vertices[v_idx].color[2]);
+
+         // Set the vertex position
+         glVertex3f(vertices[v_idx].position[0], vertices[v_idx].position[1], vertices[v_idx].position[2]);
+
+          
+         
+      }
+
+      glEnd();
+      glPopMatrix();
+   }
+}
 
 BodyFrame* readMotionCaptureData(const char* filename, int* frameCount) {
     FILE* file = fopen(filename, "r");
@@ -515,49 +640,17 @@ Vector3 normalize(Vector3 v) {
 Vector3 subtract(Vector3 a, Vector3 b) {
     return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z};
 }
-
 float vectorLength(Vector3 v) {
     return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
-
 Vector3 scale(Vector3 v, float scalar) {
     return (Vector3){v.x * scalar, v.y * scalar, v.z * scalar};
 }
-
 Vector3 multiplyVec(Vector3 v1, Vector3 v2) {
     return (Vector3){v1.x * v2.x, v1.y * v2.y, v1.z * v2.z};
 }
 
 //END OF HELPER FUNCTIONS
-
-void drawShoulders(Vector3 JointPos, Vector3 JointRot, float neckLength) { //draws a bone sticking straight down, for a given length
-//returns the end position of the bone
-   glPushMatrix();
-   // Translate to the head position
-   glTranslatef(JointPos.x, JointPos.y, JointPos.z);
-
-   // Apply the head's rotation
-   glRotatef(JointRot.z, 0.0f, 0.0f, 1.0f);
-   glRotatef(JointRot.y, 0.0f, 1.0f, 0.0f);
-   glRotatef(JointRot.x, 1.0f, 0.0f, 0.0f);
-
-   // Set the color for the neck line
-   glColor3f(0.1f, 0.1f, 1.0f); // light color for neck line
-
-   // Draw the line from the origin (head position) to the endpoint
-   glBegin(GL_LINES);
-   glVertex3f(0.0f, 0.0f, 0.0f);           // Start at the head position
-   glVertex3f(0.0f, -neckLength, 0.0f);     // End point, extended downwards
-
-   glVertex3f(0.0f, -neckLength, 0.0f);           // Start at the sternum
-   glVertex3f(neckLength, -neckLength, 0.0f);     // left clavicle
-
-   glVertex3f(0.0f, -neckLength, 0.0f);           // Start at the sternum
-   glVertex3f(-neckLength, -neckLength, 0.0f);     // right clavicle
-
-   glEnd();
-   glPopMatrix();
-}
 
 
 
@@ -596,7 +689,7 @@ void display()
       //  Light position
       float Position[]  = {distance*Cos(zh),ylight,distance*Sin(zh),1.0};
       //  Draw light position as ball (still no lighting here)
-      glColor3ub(242, 140, 44);
+      glColor3ub(242, 140, 0);
       ball(Position[0],Position[1],Position[2] , 0.1);
 
       float Emission[]  = {0.0,0.0,0.0,1.0};
@@ -604,40 +697,44 @@ void display()
       // float Diffuse[]   = {1.0,1.0,1.0,1.0};
       // float Specular[]  = {spc,spc,spc,1.0};
       float Shinyness[] = {16};
-      //  OpenGL should normalize normal vectors
+      //  OpenGL should normalize normal vectors 
       glEnable(GL_NORMALIZE);
       //  Enable lighting
       glEnable(GL_LIGHTING);
+      //  Enable light 0
+      glEnable(GL_LIGHT0);
       //  Location of viewer for specular calculations
       glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER,local);
       //  glColor sets ambient and diffuse color materials
-      glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
-      glEnable(GL_COLOR_MATERIAL);
-      //  Enable light 0
-      glEnable(GL_LIGHT0);
-      //  Set ambient, diffuse, specular components and position of light 0
-      glLightfv(GL_LIGHT0,GL_AMBIENT ,Ambient);
-      glLightfv(GL_LIGHT0,GL_DIFFUSE ,Diffuse);
-      glLightfv(GL_LIGHT0,GL_SPECULAR,Specular);
-      glLightfv(GL_LIGHT0,GL_POSITION,Position);
-
       //  Set materials
-      glMaterialfv(GL_FRONT_AND_BACK,GL_SHININESS,Shinyness);
-      // glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT,RGBA);
-      // glMaterialfv(GL_FRONT_AND_BACK,GL_DIFFUSE,RGBA);
-      glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,Specular);
-      glMaterialfv(GL_FRONT_AND_BACK,GL_EMISSION,Emission);
+      
+      // glColorMaterial(GL_FRONT_AND_BACK,GL_SPECULAR);
+      // glColorMaterial(GL_FRONT_AND_BACK,GL_EMISSION);
+      //  Set ambient, diffuse, specular components and position of light 0
+   glLightfv(GL_LIGHT0,GL_AMBIENT ,Ambient);
+   glLightfv(GL_LIGHT0,GL_DIFFUSE ,Diffuse);
+   glLightfv(GL_LIGHT0,GL_SPECULAR,Specular);
+   glLightfv(GL_LIGHT0,GL_POSITION,Position);
+   //  Set materials
+   glMaterialfv(GL_FRONT_AND_BACK,GL_SHININESS,Shinyness);
+   glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT,RGBA);
+   glMaterialfv(GL_FRONT_AND_BACK,GL_DIFFUSE,RGBA);
+   glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,Specular);
+   glMaterialfv(GL_FRONT_AND_BACK,GL_EMISSION,Emission);
+
+  
+   glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
+   glEnable(GL_COLOR_MATERIAL);
+
    }
    else{
       glDisable(GL_LIGHTING);
+      
    }
    //SHAPES TO BE DRAWN SECTION **************
 
    //Drawing the OBJ model: 
-   glPushMatrix();
-   glScaled(ObjScale,ObjScale,ObjScale);
-   glCallList(SuperHotModel);
-   glPopMatrix();
+   DrawObj(); 
 
 
 
@@ -787,7 +884,7 @@ void display()
       glWindowPos2i(5,45);
       Print("Model=%s LocalViewer=%s Distance=%d Elevation=%.1f",smooth?"Smooth":"Flat",local?"On":"Off",distance,ylight);
       glWindowPos2i(5,25);
-      Print("Ambient=%d  Diffuse=%d Specular=%d Emission=%d Shininess=%.0f",ambient,diffuse,specular,emission,shiny);
+      // Print("Ambient=%d  Diffuse=%d Specular=%d Emission=%d Shininess=%.0f",ambient,diffuse,specular,emission,shiny);
    }
    //  Render the scene
    ErrCheck("display");
@@ -914,8 +1011,32 @@ void key(unsigned char ch,int x,int y)
    //toggle light movement
    else if (ch == 'm' || ch == 'M')
       move = 1-move;
-   //move up and down
-   
+   //CONTROLLS FOR LIGHTING
+   // //  Ambient level
+   // else if (ch=='z' && ambient>0)
+   //    ambient -= 5;
+   // else if (ch=='Z' && ambient<100)
+   //    ambient += 5;
+   // //  Diffuse level
+   // else if (ch=='x' && diffuse>0)
+   //    diffuse -= 5;
+   // else if (ch=='X' && diffuse<100)
+   //    diffuse += 5;
+   // //  Specular level
+   // else if (ch=='c' && specular>0)
+   //    specular -= 5;
+   // else if (ch=='C' && specular<100)
+   //    specular += 5;
+   // //  Emission level
+   // else if (ch=='v' && emission>0)
+   //    emission -= 5;
+   // else if (ch=='V' && emission<100)
+   //    emission += 5;
+   // //  Shininess level
+   // else if (ch=='b' && shininess>-1)
+   //    shininess -= 1;
+   // else if (ch=='B' && shininess<7)
+   //    shininess += 1;
 
    //  Toggle axes
    else if (ch == ' '){
@@ -958,7 +1079,7 @@ void idle()
 {
    static int firstCall = 1;
     if (firstCall) {
-        playSound("waves.mp3");
+      //   playSound("SuperhotMusic.mp3");
         firstCall = 0;
     }
 
@@ -986,7 +1107,7 @@ int main(int argc,char* argv[])
    glutInitWindowSize(600,600);
    glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
    //  Create the window
-   glutCreateWindow("SUPERHOT 3RD Person");
+   glutCreateWindow("SUPERHOT 3RD Person BEEG");
 #ifdef USEGLEW
    //  Initialize GLEW
    if (glewInit()!=GLEW_OK) Fatal("Error initializing GLEW\n");
@@ -1013,16 +1134,22 @@ int main(int argc,char* argv[])
    if (argc >= 3) {
       ObjScale = atof(argv[2]);  // Convert to a double 
    }
-   SuperHotModel = LoadOBJ(argv[1]);
+   // if (argc>=6) RGBA[0] = strtod(argv[3],NULL);
+   // if (argc>=6) RGBA[1] = strtod(argv[4],NULL);
+   // if (argc>=6) RGBA[2] = strtod(argv[5],NULL);
+   // SuperHotModel = LoadOBJ(argv[1]);
+   loadOBJWithColor("SuperHotColored.obj");
+   // printOBJData(); 
 
 
 
    if (!motionData) {
       return 1;
    }
+   ErrCheck("init");
 
    glutMainLoop();
-
+   
    free(motionData);
    Mix_CloseAudio();
    SDL_Quit();

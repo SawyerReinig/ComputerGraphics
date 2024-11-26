@@ -19,18 +19,9 @@
 //  files may have correct surfaces, but the normals are complete junk and so
 //  the lighting is totally broken.  So beware of which OBJ files you use.
 
-//  Material structure
-typedef struct
-{
-   char* name;                 //  Material name
-   float Ka[4],Kd[4],Ks[4],Ns; //  Colors and shininess
-   float d;                    //  Transparency
-   int map;                    //  Texture
-} mtl_t;
 
-//  Material count and array
-static int Nmtl=0;
-static mtl_t* mtl=NULL;
+static float* C;  // Array for vertex colors
+static int Nc, Mc;  // Number and max number of colors
 
 //
 //  Return true if CR or LF
@@ -139,224 +130,111 @@ static void readcoord(char* line,int n,float* x[],int* N,int* M)
    (*N)+=n;
 }
 
-//
-//  Read string conditionally
-//     Line must start with skip string
-//     After skip sting return first word
-//     getword terminates the line
-//
-static char* readstr(char* line,const char* skip)
-{
-   //  Check for a match on the skip string
-   while (*skip && *line && *skip==*line)
-   {
-      skip++;
-      line++;
-   }
-   //  Skip must be NULL for a match
-   if (*skip || !isspace(*line)) return NULL;
-   //  Read string
-   return getword(&line);
+static void readcoordwithcolor(char* line, int n, int c, float* x[], int* N, int* M, float* color[], int* Nc, int* Mc) {
+    // Allocate memory if necessary
+    if (*N + n > *M) {
+        *M += 8192;
+        *x = (float*)realloc(*x, (*M) * sizeof(float));
+        if (!*x) Fatal("Cannot allocate memory for vertex coordinates\n");
+    }
+    if (*Nc + c > *Mc) {
+        *Mc += 8192;
+        *color = (float*)realloc(*color, (*Mc) * sizeof(float));
+        if (!*color) Fatal("Cannot allocate memory for vertex colors\n");
+    }
+    // Read coordinates
+    readfloat(line, n, (*x) + *N);
+    (*N) += n;
+    // Read colors (if provided)
+    char* remaining = line + n * 2;  // Assuming each float has a max of 2 characters for simplicity
+    for (int i = 0; i < c; i++) {
+        char* str = getword(&remaining);
+        if (str) {
+            if (sscanf(str, "%f", (*color) + (*Nc) + i) != 1) Fatal("Error reading vertex color %d\n", i);
+        } else {
+            (*color)[(*Nc) + i] = 1.0f;  // Default color to white if not provided
+        }
+    }
+    (*Nc) += c;
 }
 
-//
-//  Load materials from file
-//
-static void LoadMaterial(const char* file)
-{
-   int k=-1;
-   char* line;
-   char* str;
+int SawyersLoadOBJ(const char* file) {
+    int Nv, Nn, Nt;  // Number of vertex, normal, and textures
+    int Mv, Mn, Mt;  // Maximum vertex, normal, and textures
+    Nc = Mc = 0;     // Initialize color counts
+    float* V = NULL; // Array of vertexes
+    float* N = NULL; // Array of normals
+    float* T = NULL; // Array of texture coordinates
+    C = NULL;        // Array for vertex colors
+    char* line;      // Line pointer
+    char* str;       // String pointer
 
-   //  Open file or return with warning on error
-   FILE* f = fopen(file,"r");
-   if (!f)
-   {
-      fprintf(stderr,"Cannot open material file %s\n",file);
-      return;
-   }
+    // Open file
+    FILE* f = fopen(file, "r");
+    if (!f) Fatal("Cannot open file %s\n", file);
 
-   //  Read lines
-   while ((line = readline(f)))
-   {
-      //  New material
-      if ((str = readstr(line,"newmtl")))
-      {
-         int l = strlen(str);
-         //  Allocate memory for structure
-         k = Nmtl++;
-         mtl = (mtl_t*)realloc(mtl,Nmtl*sizeof(mtl_t));
-         //  Store name
-         mtl[k].name = (char*)malloc(l+1);
-         if (!mtl[k].name) Fatal("Cannot allocate %d for name\n",l+1);
-         strcpy(mtl[k].name,str);
-         //  Initialize materials
-         mtl[k].Ka[0] = mtl[k].Ka[1] = mtl[k].Ka[2] = 0;   mtl[k].Ka[3] = 1;
-         mtl[k].Kd[0] = mtl[k].Kd[1] = mtl[k].Kd[2] = 0;   mtl[k].Kd[3] = 1;
-         mtl[k].Ks[0] = mtl[k].Ks[1] = mtl[k].Ks[2] = 0;   mtl[k].Ks[3] = 1;
-         mtl[k].Ns  = 0;
-         mtl[k].d   = 0;
-         mtl[k].map = 0;
-      }
-      //  If no material short circuit here
-      else if (k<0)
-      {}
-      //  Ambient color
-      else if (line[0]=='K' && line[1]=='a')
-         readfloat(line+2,3,mtl[k].Ka);
-      //  Diffuse color
-      else if (line[0]=='K' && line[1] == 'd')
-         readfloat(line+2,3,mtl[k].Kd);
-      //  Specular color
-      else if (line[0]=='K' && line[1] == 's')
-         readfloat(line+2,3,mtl[k].Ks);
-      //  Material Shininess
-      else if (line[0]=='N' && line[1]=='s')
-      {
-         readfloat(line+2,1,&mtl[k].Ns);
-         //  Limit to 128 for OpenGL
-         if (mtl[k].Ns>128) mtl[k].Ns = 128;
-      }
-      //  Textures (must be BMP - will fail if not)
-      else if ((str = readstr(line,"map_Kd")))
-         mtl[k].map = LoadTexBMP(str);
-      //  Ignore line if we get here
-   }
-   fclose(f);
-}
+    // Start new display list
+    int list = glGenLists(1);
+    glNewList(list, GL_COMPILE);
+    glPushAttrib(GL_ENABLE_BIT | GL_TEXTURE_BIT);
 
-//
-//  Set material
-//
-static void SetMaterial(const char* name)
-{
-   //  Search materials for a matching name
-   for (int k=0;k<Nmtl;k++)
-      if (!strcmp(mtl[k].name,name))
-      {
-         //  Set material colors
-         glMaterialfv(GL_FRONT_AND_BACK,GL_AMBIENT  ,mtl[k].Ka);
-         glMaterialfv(GL_FRONT_AND_BACK,GL_DIFFUSE  ,mtl[k].Kd);
-         glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR ,mtl[k].Ks);
-         glMaterialfv(GL_FRONT_AND_BACK,GL_SHININESS,&mtl[k].Ns);
-         //  Bind texture if specified
-         if (mtl[k].map)
-         {
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D,mtl[k].map);
-         }
-         else
-            glDisable(GL_TEXTURE_2D);
-         return;
-      }
-   //  No matches
-   fprintf(stderr,"Unknown material %s\n",name);
-}
+    // Read vertexes and facets
+    Nv = Nn = Nt = 0;
+    Mv = Mn = Mt = 0;
+    while ((line = readline(f))) {
+        // Vertex coordinates (with colors, if available)
+        if (line[0] == 'v' && line[1] == ' ')
+            readcoordwithcolor(line + 2, 3, 3, &V, &Nv, &Mv, &C, &Nc, &Mc);
+        // Normal coordinates (always 3)
+        else if (line[0] == 'v' && line[1] == 'n')
+            readcoord(line + 2, 3, &N, &Nn, &Mn);
+        // Texture coordinates (always 2)
+        else if (line[0] == 'v' && line[1] == 't')
+            readcoord(line + 2, 2, &T, &Nt, &Mt);
+        // Read and draw facets
+        else if (line[0] == 'f') {
+            line++;
+            glBegin(GL_POLYGON);
+            while ((str = getword(&line))) {
+                int Kv, Kt, Kn;
+                if (sscanf(str, "%d/%d/%d", &Kv, &Kt, &Kn) == 3) {
+                    if (Kv < 0 || Kv > Nv / 3) Fatal("Vertex %d out of range 1-%d\n", Kv, Nv / 3);
+                    if (Kn < 0 || Kn > Nn / 3) Fatal("Normal %d out of range 1-%d\n", Kn, Nn / 3);
+                    if (Kt < 0 || Kt > Nt / 2) Fatal("Texture %d out of range 1-%d\n", Kt, Nt / 2);
+                } else if (sscanf(str, "%d//%d", &Kv, &Kn) == 2) {
+                    if (Kv < 0 || Kv > Nv / 3) Fatal("Vertex %d out of range 1-%d\n", Kv, Nv / 3);
+                    if (Kn < 0 || Kn > Nn / 3) Fatal("Normal %d out of range 1-%d\n", Kn, Nn / 3);
+                    Kt = 0;
+                } else if (sscanf(str, "%d", &Kv) == 1) {
+                    if (Kv < 0 || Kv > Nv / 3) Fatal("Vertex %d out of range 1-%d\n", Kv, Nv / 3);
+                    Kn = 0;
+                    Kt = 0;
+                } else
+                    Fatal("Invalid facet %s\n", str);
 
-//
-//  Load OBJ file
-//
-int LoadOBJ(const char* file)
-{
-   int  Nv,Nn,Nt;  //  Number of vertex, normal and textures
-   int  Mv,Mn,Mt;  //  Maximum vertex, normal and textures
-   float* V;       //  Array of vertexes
-   float* N;       //  Array of normals
-   float* T;       //  Array if textures coordinates
-   char*  line;    //  Line pointer
-   char*  str;     //  String pointer
+                // Draw vectors
+               float r = C[3 * (Kv - 1) + 0];  // Red component
+               float g = C[3 * (Kv - 1) + 1];  // Green component
+               float b = C[3 * (Kv - 1) + 2];  // Blue component
+               printf("Color of the current vertex is:%f,%f,%f \n", r,g,b); 
 
-   //  Open file
-   FILE* f = fopen(file,"r");
-   if (!f) Fatal("Cannot open file %s\n",file);
-
-   // Reset materials
-   mtl = NULL;
-   Nmtl = 0;
-
-   //  Start new displaylist
-   int list = glGenLists(1);
-   glNewList(list,GL_COMPILE);
-   //  Push attributes for textures
-   glPushAttrib(GL_ENABLE_BIT|GL_TEXTURE_BIT);
-
-   //  Read vertexes and facets
-   V  = N  = T  = NULL;
-   Nv = Nn = Nt = 0;
-   Mv = Mn = Mt = 0;
-   while ((line = readline(f)))
-   {
-      //  Vertex coordinates (always 3)
-      if (line[0]=='v' && line[1]==' ')
-         readcoord(line+2,3,&V,&Nv,&Mv);
-      //  Normal coordinates (always 3)
-      else if (line[0]=='v' && line[1] == 'n')
-         readcoord(line+2,3,&N,&Nn,&Mn);
-      //  Texture coordinates (always 2)
-      else if (line[0]=='v' && line[1] == 't')
-         readcoord(line+2,2,&T,&Nt,&Mt);
-      //  Read and draw facets
-      else if (line[0]=='f')
-      {
-         line++;
-         //  Read Vertex/Texture/Normal triplets
-         glBegin(GL_POLYGON);
-         while ((str = getword(&line)))
-         {
-            int Kv,Kt,Kn;
-            //  Try Vertex/Texture/Normal triplet
-            if (sscanf(str,"%d/%d/%d",&Kv,&Kt,&Kn)==3)
-            {
-               if (Kv<0 || Kv>Nv/3) Fatal("Vertex %d out of range 1-%d\n",Kv,Nv/3);
-               if (Kn<0 || Kn>Nn/3) Fatal("Normal %d out of range 1-%d\n",Kn,Nn/3);
-               if (Kt<0 || Kt>Nt/2) Fatal("Texture %d out of range 1-%d\n",Kt,Nt/2);
+               glColor3f(r, g, b);             // Set vertex color
+                if (Kt) glTexCoord2fv(T + 2 * (Kt - 1));
+                if (Kn) glNormal3fv(N + 3 * (Kn - 1));
+                if (Kv) glVertex3fv(V + 3 * (Kv - 1));
             }
-            //  Try Vertex//Normal pairs
-            else if (sscanf(str,"%d//%d",&Kv,&Kn)==2)
-            {
-               if (Kv<0 || Kv>Nv/3) Fatal("Vertex %d out of range 1-%d\n",Kv,Nv/3);
-               if (Kn<0 || Kn>Nn/3) Fatal("Normal %d out of range 1-%d\n",Kn,Nn/3);
-               Kt = 0;
-            }
-            //  Try Vertex index
-            else if (sscanf(str,"%d",&Kv)==1)
-            {
-               if (Kv<0 || Kv>Nv/3) Fatal("Vertex %d out of range 1-%d\n",Kv,Nv/3);
-               Kn = 0;
-               Kt = 0;
-            }
-            //  This is an error
-            else
-               Fatal("Invalid facet %s\n",str);
-            //  Draw vectors
-            if (Kt) glTexCoord2fv(T+2*(Kt-1));
-            if (Kn) glNormal3fv(N+3*(Kn-1));
-            if (Kv) glVertex3fv(V+3*(Kv-1));
-         }
-         glEnd();
-      }
-      //  Use material
-      else if ((str = readstr(line,"usemtl")))
-         SetMaterial(str);
-      //  Load materials
-      else if ((str = readstr(line,"mtllib")))
-         LoadMaterial(str);
-      //  Skip this line
-   }
-   fclose(f);
-   //  Pop attributes (textures)
-   glPopAttrib();
-   glEndList();
+            glEnd();
+        }
+    }
+    fclose(f);
+    glPopAttrib();
+    glEndList();
 
-   //  Free materials
-   for (int k=0;k<Nmtl;k++)
-      free(mtl[k].name);
-   free(mtl);
+    // Free arrays
+    free(V);
+    free(T);
+    free(N);
+    free(C);
 
-   //  Free arrays
-   free(V);
-   free(T);
-   free(N);
-
-   return list;
+    return list;
 }

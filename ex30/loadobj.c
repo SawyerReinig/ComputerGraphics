@@ -329,6 +329,7 @@ int LoadOBJ(const char* file)
             else
                Fatal("Invalid facet %s\n",str);
             //  Draw vectors
+            glColor3b(0.7f,0.1f,0.1f);
             if (Kt) glTexCoord2fv(T+2*(Kt-1));
             if (Kn) glNormal3fv(N+3*(Kn-1));
             if (Kv) glVertex3fv(V+3*(Kv-1));
