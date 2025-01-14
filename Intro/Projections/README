@@ -1,0 +1,23 @@
+Projections
+
+To import the SDL2 audio library 
+Linux: sudo apt-get install libsdl2-dev libsdl2-mixer-dev
+macOS: brew install sdl2 sdl2_mixer
+
+Let me know if the audio is breaking things and I'll be happy to resubmit without it. 
+
+Enjoy a nice stroll on this peaceful beach. Let the calming wave sounds sooth your ailes
+
+This scene was built off hw3. 
+
+This took me about 2.5 hours. 
+
+Key bindings
+  m/M        Cycle through perspectives
+  z          Toggle axes
+  WASD       Move Around in FP
+  arrows     Change view angle/Look around in FP
+  Spacebar   Raise View
+  c          Lower View
+  0          Reset view angle -- Does not work in FP
+  ESC        Exit

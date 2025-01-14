@@ -1,0 +1,36 @@
+Lighting
+
+To import the SDL2 audio library 
+Linux: sudo apt-get install libsdl2-dev libsdl2-mixer-dev
+macOS: brew install sdl2 sdl2_mixer
+But I think we got that sorted last time
+
+Enjoy the wonderful morning sunrise. 
+
+This took me about 4.5 hours. 
+
+
+The light is set to a sunrise position, but all the controlls for moving the light still work.
+
+Also sorry the conrtolls for messing with the light settings are weird, I wanted to keep my WASD for movement
+
+Key bindings
+  p          Cycle through perspectives
+  SPacebar   Toggle axes
+  WASD       Move Around in FP
+  arrows     Change view angle/Look around in FP
+  e          Raise View
+  q          Lower View
+  0          Reset view angle -- Does not work in FP
+  ESC        Exit
+  l          Toggles lighting
+  z/Z        Decrease/increase ambient light
+  x/X        Decrease/increase diffuse light
+  c/C        Decrease/increase specular light
+  v/V        Decrease/increase emitted light
+  b/B        Decrease/increase shininess
+  m          Toggles light movement
+  []         Lower/rise light
+  p          Toggles ortogonal/perspective projection
+  o          Cycles through objects
+  +/-        Change field of view of perspective

@@ -1,0 +1,30 @@
+Textures
+
+Now you can feel the sand between your toes. 
+
+This took me about 6 hours. This was honestly harder than lighting. My textures kept glitching and I was convinced there were ghosts in my computer. 
+
+But now there is a nice, yet admitedly a bit to firey, skybox. 
+
+Also I litteraly just screen captured the individual parts of the skybox, thats why the edges aren't great. 
+
+Key bindings
+  p          Cycle through perspectives
+  Spacebar   Toggle axes
+  WASD       Move Around in FP
+  arrows     Change view angle/Look around in FP
+  e          Raise View
+  q          Lower View
+  0          Reset view angle -- Does not work in FP
+  ESC        Exit
+  l          Toggles lighting
+  z/Z        Decrease/increase ambient light
+  x/X        Decrease/increase diffuse light
+  c/C        Decrease/increase specular light
+  v/V        Decrease/increase emitted light
+  b/B        Decrease/increase shininess
+  m          Toggles light movement
+  []         Lower/rise light
+  p          Toggles ortogonal/perspective projection
+  o          Cycles through objects
+  +/-        Change field of view of perspective

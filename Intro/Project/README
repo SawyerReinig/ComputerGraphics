@@ -1,0 +1,84 @@
+# Sawyer Reinig SuperHot Third Person
+
+## Notes For Running
+I thing I figured out how to have it open in the correct directory :) Should just have to make and run
+make
+./final 
+
+## IMPORTANT KEYS
+1: Animate person with just bodyparts, no joint connections
+2: Draw whole character **This is the Default**
+3: Boneman
+
+4: Breakdance Animation
+5: Backflip Animation
+6: Hook and Jab Animation, **This one looks the best I think and is default**
+
+m: Toggles light movement
+t: Toggles stencil shader texture **Default is lines, Nebula is to help show people what is going on**
+
+Spacebar:   Toggle axes and pause animation
+
+
+# MY CONTRIBUTIONS
+
+## Here is the susinct version so you don't need to read my whole essay on what I did:
+
+Created my own version of the object loader which handles colored vertices. 
+
+Used blender to create the fix a crappy internet model, and colored each vertex so I could tell what limb it belonged to. And gathered points of rotation for each limb. 
+
+Used my own vector math to align the mesh bodyparts with the bones I created from my motion capture CSV. 
+
+Used the stencil buffer to create a stencil shader, giving the character the moving lines effect. 
+
+Added transparency to the stencil shader so you could still see the normals/lighting of the character.
+
+Fixed the normal vectors using crossproducts of the face vectors. Fortunately the OBJ consistently used counterclockwise wrapping or each triangle. 
+
+### This is the long version that you don't have to read
+I did not use any copied code from the internet. I did use GPT for much of the menial labor, for example copying all the rows of my motion capture csv file into the BodyFrame data structure. I also used it to help me create many of my vector math functions. For example I knew that I was going to need to apply my 4x4 matrix to each point and each normal vector, so I had it create a function that multiplies Matricies and my vector3 structs. 
+
+Most of my time was spent trying to correctly allign the bodyparts. 
+At first I was hoping that I could just use the rotation of the joint, which I was able to record in my motion capture data, but that ended up being pretty crappy, and each joint used a different rotation base. 
+
+I decided the best way would be to find similar points in the Meshman (the points in the obj) and Boneman (The lines and cubes that are essentailly the bones of the motion). Then I create two vectors by subtracting two point, for example the hand position from the elbow position in Meshman and Boneman. Then I create a transformation matrix that would transform the Meshman vector into the Boneman vector. Finally, I can apply this transformation matrix to all the points of the associated bodypart and it looks pretty good. This is also why some of the limbs face the wrong direction sometimes. 
+
+I also needed to work in blender to find all the rotation positons for the limbs, and to color vertices for the limbs so I could identify them in openGL. 
+
+Because I needed to have specific colors for the vertices of the model, I created my own object loader. This also had the benefit of allowing me to know the object loader inside and out. And starngely enough, when I used the example OBJ loader, my model that only had about 1000 points was running at about 12 FPS on my WSL. But when I wrote my own object loader, it runs at the max frame rate. Which made testing a whole lot more fun. 
+
+# Next Steps
+
+## Susinct version:
+
+Fix the rotation problems with the head. 
+
+Create a scene that more accurately portrays Superhot using Fog and Shadows. 
+
+### Long version that you dont have to read
+I am currently using a different method to translate the head, since heads only have one joint. When I was looking at the bone structure for my reference in blender, I noticed that there is an extra bone that extends above the head. So I need to record another position above both Boneman's and Meshman's head. Then do the same vector to vector math I do for all the other limbs. 
+
+It would also be good to look into solutions for the limbs being rotated the wrong way sometimes.
+
+But I think most of the work from here on is going to be put towards making the world look more like the Superhot world. So I will add fog, and likely shadows. 
+
+If I really want to go above and beyond, Superhot uses one of those shaders where the texture is kind of a portal to an image. People often use this to draw starry space inside an object. And I've always wanted to make one of those shaders. 
+
+## Final Remarks
+Despite that it doesn't look perfect, I feel like the way I solved the problems I encountered was really good. I've always wanted to be able to write huge amounts of code and know what it would do when I finished, and there were many opportunites when I got to see the fruits of the previous hours of work. Very fulfiling. 
+
+
+Key bindings
+  p          Cycle through perspectives
+  WASD       Move Around in FP
+  arrows     Change view angle/Look around in FP
+  e          Raise View
+  q          Lower View
+  0          Reset view angle -- Does not work in FP
+  ESC        Exit
+  l          Toggles lighting
+  []         Lower/rise light
+  p          Toggles ortogonal/perspective projection
+  o          Cycles through objects
+  +/-        Change field of view of perspective
